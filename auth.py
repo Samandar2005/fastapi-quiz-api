@@ -1,17 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from starlette.status import HTTP_401_UNAUTHORIZED
 from models import User
-from tortoise.exceptions import DoesNotExist
+from tortoise.exceptions import DoesNotExist, IntegrityError
 from pydantic import BaseModel
 from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from schemas import UserCreate, UserResponse
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__truncate_error=False,
+)
 
 router = APIRouter()
 
@@ -45,19 +50,6 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     return encoded_jwt
 
 
-@router.post("/token")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = await authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
- 
-
-
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     credential_exception = HTTPException(
         status_code=HTTP_401_UNAUTHORIZED,
@@ -76,3 +68,32 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except DoesNotExist:
         raise credential_exception
     return user
+
+
+@router.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = await authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def signup(payload: UserCreate):
+    hashed_password = get_password_hash(payload.password)
+    try:
+        user = await User.create(
+            username=payload.username,
+            email=payload.email,
+            hashed_password=hashed_password,
+        )
+    except IntegrityError:
+        raise HTTPException(status_code=400, detail="Username or email already exists")
+    return user
+
+
+@router.get("/me", response_model=UserResponse)
+async def read_me(current_user: User = Depends(get_current_user)):
+    return current_user
