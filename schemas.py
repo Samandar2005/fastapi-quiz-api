@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
+from datetime import datetime
 
 
 class UserCreate(BaseModel):
@@ -47,4 +48,39 @@ class QuestionCreate(BaseModel):
 class QuestionResponse(QuestionCreate):
     id: int
     answers: List[AnswerResponse] = Field(default_factory=list)
+    model_config = ConfigDict(from_attributes=True)
+
+class QuizAttemptCreate(BaseModel):
+    category_id: Optional[int] = None
+
+class QuizAttemptResponse(BaseModel):
+    id: int
+    category: Optional[str] = None
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    time_spent: Optional[int] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class QuizResultResponse(BaseModel):
+    id: int
+    total_questions: int
+    correct_answers: int
+    score: float
+    completed_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class UserStatisticsResponse(BaseModel):
+    total_quizzes: int
+    total_questions_answered: int
+    correct_answers: int
+    average_score: float
+    total_time_spent: int
+    last_quiz_date: Optional[datetime]
+    model_config = ConfigDict(from_attributes=True)
+
+class LeaderboardEntry(BaseModel):
+    username: str
+    total_quizzes: int
+    average_score: float
+    total_questions_answered: int
     model_config = ConfigDict(from_attributes=True)

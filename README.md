@@ -18,8 +18,10 @@ A minimal REST API for quizzes with JWT authentication. Built with FastAPI and T
 
 ### What does this project do?
 - **Authenticates users via JWT** (`/auth/token`).
-- Allows **creating questions** and **listing questions** (`/quiz/questions/`).
-- Persists answers related to questions at the model level.
+- **Category Management**: Create, list, update, and delete question categories.
+- **Quiz Questions**: Create and list questions, filter by category.
+- **Quiz Attempts**: Track user attempts and completion.
+- **Statistics & Leaderboard**: User statistics and global leaderboard.
 - All quiz endpoints are protected and require `Bearer <token>`.
 
 ### Key features
@@ -79,10 +81,13 @@ Tortoise will auto-generate schemas on startup (`generate_schemas=True`). Ensure
 
 Models (see `models.py`):
 - `User(username, email, hashed_password, is_active)`
-- `Question(text, category, difficulty, created_at)`
+- `Category(name, description, created_at)`
+- `Question(text, category -> Category, difficulty, created_at)`
 - `Answer(question -> Question, text, is_correct)`
 - `UserAnswer(user, question, answer, answered_at)`
-- `QuizResult(user, total_questions, correct_answers, completed_at)`
+- `QuizAttempt(user, category, started_at, completed_at, time_spent)`
+- `QuizResult(attempt, user, total_questions, correct_answers, score, completed_at)`
+- `UserStatistics(user, total_quizzes, total_questions_answered, correct_answers, average_score, total_time_spent, last_quiz_date)`
 
 ### Running
 Development server:
@@ -138,13 +143,38 @@ Use the token with `Authorization: Bearer <JWT>` for protected endpoints. To fet
 ### Quiz Endpoints
 Prefix: `/quiz`
 
-- `POST /quiz/questions/` — Create a question (auth required)
-  - Body (JSON): `{ "text": "...", "category": "...", "difficulty": "..." }`
+Categories:
+- `POST /quiz/categories/` — Create a category
+  - Body: `{ "name": "...", "description": "..." }`
+  - Response: Category object with `id`
+
+- `GET /quiz/categories/` — List all categories
+  - Response: Array of category objects
+
+Questions:
+- `POST /quiz/questions/` — Create a question
+  - Body: `{ "text": "...", "category_id": "...", "difficulty": "..." }`
   - Response: `QuestionResponse` including generated `id`
 
-- `GET /quiz/questions/?skip=0&limit=10` — List questions with their answers (auth required)
-  - Query: `skip`, `limit`
+- `GET /quiz/questions/?skip=0&limit=10&category_id=1` — List questions
+  - Query: `skip`, `limit`, optional `category_id`
   - Response: `List[QuestionResponse]`
+
+Quiz Attempts:
+- `POST /quiz/attempts/` — Start a new quiz attempt
+  - Body: `{ "category_id": "..." }` (optional)
+  - Response: Attempt object with `id`, `started_at`
+
+- `POST /quiz/attempts/{id}/complete` — Complete an attempt
+  - Response: Result with total questions, correct answers, score
+
+Statistics:
+- `GET /quiz/statistics/me` — Get personal statistics
+  - Response: Stats with total quizzes, scores, etc.
+
+- `GET /quiz/leaderboard?limit=10` — Get top performers
+  - Query: `limit` (optional, default 10)
+  - Response: List of users with their scores
 
 Authorization header example:
 ```http
@@ -188,6 +218,10 @@ uvicorn main:app --reload
 | POST | `/quiz/questions/` | Yes | Create a quiz question |
 | GET | `/quiz/questions/` | Yes | List quiz questions |
 | GET | `/quiz/questions/?category_id={id}` | Yes | List questions by category |
+| POST | `/quiz/attempts/` | Yes | Start a new quiz attempt |
+| POST | `/quiz/attempts/{id}/complete` | Yes | Complete a quiz attempt |
+| GET | `/quiz/statistics/me` | Yes | Get personal quiz statistics |
+| GET | `/quiz/leaderboard` | Yes | Get quiz leaderboard |
 
 ### Testing
 Run tests:

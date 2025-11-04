@@ -23,6 +23,12 @@ class Question(Model):
     difficulty = fields.CharField(max_length=20, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
 
+    async def get_category_name(self) -> str:
+        if self.category:
+            await self.fetch_related('category')
+            return self.category.name
+        return None
+
 
 class Answer(Model):
     id = fields.IntField(pk=True)
@@ -39,9 +45,29 @@ class UserAnswer(Model):
     answered_at = fields.DatetimeField(auto_now_add=True)
 
 
+class QuizAttempt(Model):
+    id = fields.IntField(pk=True)
+    user = fields.ForeignKeyField('models.User', related_name='quiz_attempts', on_delete=fields.CASCADE)
+    category = fields.ForeignKeyField('models.Category', related_name='quiz_attempts', null=True, on_delete=fields.SET_NULL)
+    started_at = fields.DatetimeField(auto_now_add=True)
+    completed_at = fields.DatetimeField(null=True)
+    time_spent = fields.IntField(null=True)  # in seconds
+
 class QuizResult(Model):
     id = fields.IntField(pk=True)
+    attempt = fields.ForeignKeyField('models.QuizAttempt', related_name='results', on_delete=fields.CASCADE)
     user = fields.ForeignKeyField('models.User', related_name='quiz_results', on_delete=fields.CASCADE)
     total_questions = fields.IntField()
     correct_answers = fields.IntField()
+    score = fields.FloatField()  # percentage
     completed_at = fields.DatetimeField(auto_now_add=True)
+
+class UserStatistics(Model):
+    id = fields.IntField(pk=True)
+    user = fields.ForeignKeyField('models.User', related_name='statistics', on_delete=fields.CASCADE)
+    total_quizzes = fields.IntField(default=0)
+    total_questions_answered = fields.IntField(default=0)
+    correct_answers = fields.IntField(default=0)
+    average_score = fields.FloatField(default=0.0)
+    total_time_spent = fields.IntField(default=0)  # in seconds
+    last_quiz_date = fields.DatetimeField(null=True)
