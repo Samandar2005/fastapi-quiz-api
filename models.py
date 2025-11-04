@@ -21,6 +21,7 @@ class Question(Model):
     text = fields.TextField()
     category = fields.ForeignKeyField('models.Category', related_name='questions', null=True, on_delete=fields.SET_NULL)
     difficulty = fields.CharField(max_length=20, null=True)
+    time_limit_seconds = fields.IntField(null=True)  # per-question time limit in seconds
     created_at = fields.DatetimeField(auto_now_add=True)
 
     async def get_category_name(self) -> str:
@@ -52,6 +53,7 @@ class QuizAttempt(Model):
     started_at = fields.DatetimeField(auto_now_add=True)
     completed_at = fields.DatetimeField(null=True)
     time_spent = fields.IntField(null=True)  # in seconds
+    total_time_limit = fields.IntField(null=True)  # overall quiz time limit in seconds
 
 class QuizResult(Model):
     id = fields.IntField(pk=True)
@@ -60,6 +62,7 @@ class QuizResult(Model):
     total_questions = fields.IntField()
     correct_answers = fields.IntField()
     score = fields.FloatField()  # percentage
+    timed_out = fields.BooleanField(default=False)
     completed_at = fields.DatetimeField(auto_now_add=True)
 
 class UserStatistics(Model):

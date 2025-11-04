@@ -63,6 +63,7 @@ async def create_question(question: QuestionCreate, current_user: User = Depends
         text=new_question.text,
         category=new_question.category.name if new_question.category else None,
         difficulty=new_question.difficulty,
+        time_limit_seconds=new_question.time_limit_seconds,
         answers=[
             AnswerResponse(id=a.id, text=a.text, is_correct=a.is_correct, question_id=a.question_id)
             for a in new_question.answers
@@ -91,6 +92,7 @@ async def get_questions(
                 text=q.text,
                 category=q.category.name if q.category else None,
                 difficulty=q.difficulty,
+                time_limit_seconds=q.time_limit_seconds,
                 answers=[
                     AnswerResponse(id=a.id, text=a.text, is_correct=a.is_correct, question_id=a.question_id)
                     for a in q.answers

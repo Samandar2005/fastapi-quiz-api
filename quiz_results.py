@@ -23,14 +23,16 @@ async def start_quiz_attempt(
     
     attempt = await QuizAttempt.create(
         user=current_user,
-        category=category
+        category=category,
+        total_time_limit=attempt_data.total_time_limit,
     )
     return QuizAttemptResponse(
         id=attempt.id,
         category=category.name if category else None,
         started_at=attempt.started_at,
         completed_at=None,
-        time_spent=None
+        time_spent=None,
+        total_time_limit=attempt.total_time_limit,
     )
 
 @router.post("/attempts/{attempt_id}/complete", response_model=QuizResultResponse)
@@ -70,19 +72,29 @@ async def complete_quiz_attempt(
     
     # Update attempt
     now = datetime.now(timezone.utc)
-    time_spent = int((now - attempt.started_at.replace(tzinfo=timezone.utc)).total_seconds())
+    actual_time_spent = int((now - attempt.started_at.replace(tzinfo=timezone.utc)).total_seconds())
+
+    # Determine timeout and cap time_spent if total_time_limit is set
+    timed_out = False
+    final_time_spent = actual_time_spent
+    if attempt.total_time_limit is not None:
+        if actual_time_spent >= attempt.total_time_limit:
+            timed_out = True
+            final_time_spent = attempt.total_time_limit
+
     await attempt.update_from_dict({
         "completed_at": now,
-        "time_spent": time_spent
+        "time_spent": final_time_spent
     }).save()
-    
+
     # Create result
     result = await QuizResult.create(
         attempt=attempt,
         user=current_user,
         total_questions=total_questions,
         correct_answers=correct_answers,
-        score=score
+        score=score,
+        timed_out=timed_out,
     )
     
     # Update user statistics
@@ -95,11 +107,20 @@ async def complete_quiz_attempt(
         "total_questions_answered": stats.total_questions_answered + total_questions,
         "correct_answers": stats.correct_answers + correct_answers,
         "average_score": (stats.average_score * stats.total_quizzes + score) / (stats.total_quizzes + 1),
-        "total_time_spent": stats.total_time_spent + time_spent,
+        "total_time_spent": stats.total_time_spent + final_time_spent,
         "last_quiz_date": now
     }).save()
-    
-    return QuizResultResponse.model_validate(result)
+
+    # Build response
+    return QuizResultResponse(
+        id=result.id,
+        total_questions=result.total_questions,
+        correct_answers=result.correct_answers,
+        score=result.score,
+        time_spent=final_time_spent,
+        timed_out=timed_out,
+        completed_at=result.completed_at,
+    )
 
 @router.get("/statistics/me", response_model=UserStatisticsResponse)
 async def get_my_statistics(current_user: User = Depends(get_current_user)):

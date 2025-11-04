@@ -1,71 +1,54 @@
 ## Quiz API (FastAPI + Tortoise ORM)
 
-A minimal REST API for quizzes with JWT authentication. Built with FastAPI and Tortoise ORM, backed by PostgreSQL.
+A minimal REST API for quizzes with JWT authentication. Built with FastAPI and Tortoise ORM. This project includes:
+
+- Category management (create/list/update/delete)
+- Question management with optional per-question time limits
+- Quiz attempts with optional total quiz time limits
+- Result tracking, user statistics and a leaderboard
+- JWT authentication and pytest-based tests
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green)](https://fastapi.tiangolo.com/) [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org/) [![Tests](https://img.shields.io/badge/Tests-pytest-informational)](https://docs.pytest.org/)
 
 ### Quick links
 - Run: `uvicorn main:app --reload`
 - Docs: `http://127.0.0.1:8000/docs`
-- Auth: `POST /auth/signup`, `POST /auth/token`, `GET /auth/me`
-- Quiz: `POST /quiz/questions/`, `GET /quiz/questions/`
 
 ### Tech Stack
 - **FastAPI** for the web framework
-- **Tortoise ORM** with **PostgreSQL**
+- **Tortoise ORM** (lightweight async ORM)
 - **JWT** auth via `python-jose`
 - **passlib[bcrypt]** for password hashing
 
-### What does this project do?
-- **Authenticates users via JWT** (`/auth/token`).
-- **Category Management**: Create, list, update, and delete question categories.
-- **Quiz Questions**: Create and list questions, filter by category.
-- **Quiz Attempts**: Track user attempts and completion.
-- **Statistics & Leaderboard**: User statistics and global leaderboard.
-- All quiz endpoints are protected and require `Bearer <token>`.
+### What this project provides
 
-### Key features
-- **Quick start**: automatic schema generation (Tortoise `generate_schemas=True`).
-- **Modular architecture**: separate auth and quiz routers.
-- **Type safety**: request/response validation with Pydantic schemas.
-- **Standard OAuth2 password flow** with `Authorization: Bearer <JWT>`.
- - **Tests included**: pytest-based suite (auth and quiz flows).
+- User signup and token-based authentication (OAuth2 password flow)
+- Category CRUD for organizing questions
+- Create/list questions; optionally set a per-question time limit (`time_limit_seconds`)
+- Start quiz attempts with an optional overall `total_time_limit` (seconds)
+- Completing attempts computes score, records `time_spent`, and marks `timed_out` when limits are exceeded
+- Per-user aggregated statistics and a global leaderboard
+- Tests that cover auth, questions, categories, attempts and time-limit behavior
 
-### Project Structure
+### Project structure (top-level files)
 ```text
-quiz_api/
-  auth.py        # Auth router: token issuance + current user dependency
-  quiz.py        # Quiz router: create/list questions (auth required)
-  models.py      # Tortoise models: User, Question, Answer, UserAnswer, QuizResult
-  schemas.py     # Pydantic schemas for request/response models
-  config.py      # Configuration (DATABASE_URL, JWT config)
-  main.py        # FastAPI app, router registration, Tortoise init
-  requirements.txt
-```
-
-### How it works (short flow)
-1) Client sends `username/password` to `POST /auth/token`.
-2) Server validates the user and issues a **JWT**.
-3) Client calls protected endpoints with `Authorization: Bearer <JWT>`.
-4) Creating and fetching questions are handled by the quiz router.
-
-### Requirements
-See `requirements.txt`. Create and activate a virtualenv, then:
-
-```bash
-pip install -r requirements.txt
-```
-
-Optional (Windows):
-```bash
-python -m pip install --upgrade pip
+auth.py        # Auth router + dependencies
+quiz.py        # Quiz router: categories & questions
+quiz_results.py # Quiz attempts, completion, statistics, leaderboard
+models.py      # Tortoise models
+schemas.py     # Pydantic request/response models
+config.py      # Config (DATABASE_URL, JWT settings)
+main.py        # App entry + Tortoise registration
+tests/         # pytest tests
+requirements.txt
 ```
 
 ### Configuration
-Environment variables (via `.env` or system env):
-- `DATABASE_URL` (default: `postgres://postgres:1234@localhost:5432/quiz_db`)
-- `SECRET_KEY` (default: `change-me-in-.env`)
-- `ALGORITHM` (default: `HS256`)
+Set configuration via environment variables or a `.env` file. Key vars used by the app:
+
+- `DATABASE_URL` (example: `sqlite://:memory:` for tests or `postgres://user:pass@host:port/db`)
+- `SECRET_KEY` (set a long random secret for production)
+- `ALGORITHM` (e.g. `HS256`)
 - `ACCESS_TOKEN_EXPIRE_MINUTES` (default: `30`)
 
 Example `.env`:
@@ -76,176 +59,153 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 ```
 
-### Database
-Tortoise will auto-generate schemas on startup (`generate_schemas=True`). Ensure the target database exists and is reachable by `DATABASE_URL`.
+### Database & migrations
+During development the project uses Tortoise's `generate_schemas=True` to create tables automatically.
+For production you should adopt a proper migration strategy.
 
-Models (see `models.py`):
-- `User(username, email, hashed_password, is_active)`
-- `Category(name, description, created_at)`
-- `Question(text, category -> Category, difficulty, created_at)`
-- `Answer(question -> Question, text, is_correct)`
-- `UserAnswer(user, question, answer, answered_at)`
-- `QuizAttempt(user, category, started_at, completed_at, time_spent)`
-- `QuizResult(attempt, user, total_questions, correct_answers, score, completed_at)`
-- `UserStatistics(user, total_quizzes, total_questions_answered, correct_answers, average_score, total_time_spent, last_quiz_date)`
+### Models (high level)
+- `User` — username, email, hashed_password, is_active
+- `Category` — name, description
+- `Question` — text, category (FK), difficulty, optional `time_limit_seconds`
+- `Answer` — question (FK), text, is_correct
+- `UserAnswer` — user, question, answer, answered_at
+- `QuizAttempt` — user, category, started_at, completed_at, `time_spent`, optional `total_time_limit`
+- `QuizResult` — attempt, user, total_questions, correct_answers, score, `timed_out`
+- `UserStatistics` — aggregated per-user stats and averages
 
-### Running
-Development server:
-```bash
-uvicorn main:app --reload
-```
+### Running locally
 
-The API will be available at `http://127.0.0.1:8000`. Interactive docs:
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- ReDoc: `http://127.0.0.1:8000/redoc`
+1. Create & activate virtualenv:
 
-### Authentication
-OAuth2 Password flow with bearer tokens.
-
-Token endpoint:
-- `POST /auth/token` (form data: `username`, `password`)
-
-The app exposes signup and token endpoints. Users are stored with bcrypt-hashed passwords.
-
-Create the first user (development):
-- Option A (generate a hash only):
-  ```bash
-  python -c "from passlib.context import CryptContext; print(CryptContext(schemes=['bcrypt']).hash('secret'))"
-  ```
-  Then insert a user into the `User` table with the generated hash (via your DB client).
-
-- Option B (small ORM script): initialize Tortoise and create a user using the `User` model.
-
-Signup (cURL):
-```bash
-curl -X POST http://127.0.0.1:8000/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{"username":"alice","email":"alice@example.com","password":"secret"}'
-```
-
-Token (cURL):
-```bash
-curl -X POST \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=alice&password=secret" \
-  http://127.0.0.1:8000/auth/token
-```
-
-Response:
-```json
-{"access_token":"<JWT>","token_type":"bearer"}
-```
-
-Use the token with `Authorization: Bearer <JWT>` for protected endpoints. To fetch the current user:
-
-`GET /auth/me` (requires Authorization header)
-
-### Quiz Endpoints
-Prefix: `/quiz`
-
-Categories:
-- `POST /quiz/categories/` — Create a category
-  - Body: `{ "name": "...", "description": "..." }`
-  - Response: Category object with `id`
-
-- `GET /quiz/categories/` — List all categories
-  - Response: Array of category objects
-
-Questions:
-- `POST /quiz/questions/` — Create a question
-  - Body: `{ "text": "...", "category_id": "...", "difficulty": "..." }`
-  - Response: `QuestionResponse` including generated `id`
-
-- `GET /quiz/questions/?skip=0&limit=10&category_id=1` — List questions
-  - Query: `skip`, `limit`, optional `category_id`
-  - Response: `List[QuestionResponse]`
-
-Quiz Attempts:
-- `POST /quiz/attempts/` — Start a new quiz attempt
-  - Body: `{ "category_id": "..." }` (optional)
-  - Response: Attempt object with `id`, `started_at`
-
-- `POST /quiz/attempts/{id}/complete` — Complete an attempt
-  - Response: Result with total questions, correct answers, score
-
-Statistics:
-- `GET /quiz/statistics/me` — Get personal statistics
-  - Response: Stats with total quizzes, scores, etc.
-
-- `GET /quiz/leaderboard?limit=10` — Get top performers
-  - Query: `limit` (optional, default 10)
-  - Response: List of users with their scores
-
-Authorization header example:
-```http
-Authorization: Bearer <JWT>
-```
-
-Schemas (see `schemas.py`):
-- `QuestionCreate`: `text`, optional `category`, `difficulty`
-- `QuestionResponse`: `id`, fields from `QuestionCreate`, and `answers: List[AnswerResponse]`
-- `AnswerResponse`: `id`, `text`, `is_correct`, `question_id`
-
-### Quick Start (Local)
-1) Prepare environment
-```bash
+```powershell
 python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate
+```
+
+2. Install dependencies:
+
+```powershell
 pip install -r requirements.txt
 ```
 
-2) Configure `.env` (see above) and ensure PostgreSQL is running and database exists.
+3. Start the app:
 
-3) Run server
-```bash
+```powershell
 uvicorn main:app --reload
 ```
 
-4) Obtain token and call endpoints (via Swagger UI or cURL)
+Interactive docs will be available at `http://127.0.0.1:8000/docs`.
 
-### API Overview
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| POST | `/auth/signup` | No | Create a new user |
-| POST | `/auth/token` | No | Obtain JWT access token |
-| GET | `/auth/me` | Yes | Get current authenticated user |
-| POST | `/quiz/categories/` | Yes | Create a new category |
-| GET | `/quiz/categories/` | Yes | List all categories |
-| GET | `/quiz/categories/{id}` | Yes | Get a specific category |
-| PUT | `/quiz/categories/{id}` | Yes | Update a category |
-| DELETE | `/quiz/categories/{id}` | Yes | Delete a category |
-| POST | `/quiz/questions/` | Yes | Create a quiz question |
-| GET | `/quiz/questions/` | Yes | List quiz questions |
-| GET | `/quiz/questions/?category_id={id}` | Yes | List questions by category |
-| POST | `/quiz/attempts/` | Yes | Start a new quiz attempt |
-| POST | `/quiz/attempts/{id}/complete` | Yes | Complete a quiz attempt |
-| GET | `/quiz/statistics/me` | Yes | Get personal quiz statistics |
-| GET | `/quiz/leaderboard` | Yes | Get quiz leaderboard |
+### Authentication
+
+Use the OAuth2 password flow to obtain a JWT:
+
+- `POST /auth/signup` — register (JSON body: `username`, `email`, `password`)
+- `POST /auth/token` — get token (form data: `username`, `password`)
+
+The token response looks like:
+```json
+{"access_token": "<JWT>", "token_type": "bearer"}
+```
+
+Send the token in requests using the `Authorization: Bearer <JWT>` header.
+
+### API Endpoints (high level)
+Prefix: `/quiz`
+
+Categories
+- `POST /quiz/categories/` — Create a category
+- `GET /quiz/categories/` — List all categories
+- `GET /quiz/categories/{id}` — Get a category
+- `PUT /quiz/categories/{id}` — Update
+- `DELETE /quiz/categories/{id}` — Delete
+
+Questions
+- `POST /quiz/questions/` — Create a question
+  - body example: `{ "text": "What is 2+2?", "category_id": 1, "difficulty": "easy", "time_limit_seconds": 10 }`
+- `GET /quiz/questions/` — List questions; optional query `category_id`, `skip`, `limit`
+
+Quiz attempts & results
+- `POST /quiz/attempts/` — Start a quiz attempt (optional `{ "category_id": 1, "total_time_limit": 300 }`)
+- `POST /quiz/attempts/{id}/complete` — Complete an attempt; server computes score, records `time_spent`, and sets `timed_out` when limits exceeded
+
+Statistics & leaderboard
+- `GET /quiz/statistics/me` — Get current user's aggregated statistics
+- `GET /quiz/leaderboard` — Get top users ordered by average score (query param `limit` optional)
+
+### Time limits behavior
+
+- Per-question time limit: `Question.time_limit_seconds` is stored for a question and returned in the question response. Frontend should enforce per-question timers when presenting questions to users.
+- Total quiz time limit: set via `QuizAttempt.total_time_limit` when starting an attempt. When completing an attempt the server calculates actual elapsed time and:
+  - sets `timed_out` to `true` if elapsed time >= `total_time_limit` (inclusive),
+  - caps `time_spent` to `total_time_limit` when the limit is exceeded.
+
+Note: this implementation enforces total-time limits at attempt completion time (server-side). For stricter, real-time enforcement you can use client-side timers or websockets to auto-submit.
+
+### Examples
+
+Create question with per-question limit:
+
+```http
+POST /quiz/questions/
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "text": "What is 2+2?",
+  "category_id": 1,
+  "difficulty": "easy",
+  "time_limit_seconds": 15
+}
+```
+
+Start an attempt with a 5-minute total limit:
+
+```http
+POST /quiz/attempts/
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "category_id": 1,
+  "total_time_limit": 300
+}
+```
+
+Complete attempt:
+
+```http
+POST /quiz/attempts/{attempt_id}/complete
+Authorization: Bearer <JWT>
+```
+
+Response includes `timed_out` and `time_spent` fields.
 
 ### Testing
-Run tests:
-```bash
+
+Run tests locally (the project includes pytest tests that run against an in-memory or temporary DB configured in `tests/conftest.py`):
+
+```powershell
 pytest -q
 ```
-Notes:
-- Tests use a temporary SQLite database by setting `DATABASE_URL` at runtime.
-- Ensure virtualenv is active and dependencies are installed.
+
+All tests should pass; new tests include coverage for category CRUD, attempts/results, and time-limit enforcement.
 
 ### Troubleshooting
-- bcrypt warnings or 72-byte password error: we configure Passlib to avoid truncate errors; if issues persist, pin bcrypt:
-  ```
-  pip install 'bcrypt~=4.1.3'
-  ```
-- `python_multipart` warning: it’s a deprecation notice; already covered via `python-multipart` in requirements.
-- Import issues during tests: ensure project root is on `sys.path` (handled in `tests/conftest.py`).
 
-### Notes
-- On first run, Tortoise will create tables automatically.
-- For production, set a strong `SECRET_KEY` and consider migrations instead of auto-generate.
- - A public registration endpoint is available at `POST /auth/signup`.
+- If you see warnings about `python_multipart`, install `python-multipart` in your venv.
+- For bcrypt/passlib issues, pin `bcrypt` if needed:
+
+```powershell
+pip install 'bcrypt~=4.1.3'
+```
+
+### Notes & next steps
+
+- For production use, switch from auto-generating schemas to a proper migration workflow and ensure `SECRET_KEY` is secure.
+- Consider adding realtime enforcement (websocket) if you need server-initiated auto-submit when time expires.
 
 ### License
-MIT (or your preferred license)
+MIT
 
 

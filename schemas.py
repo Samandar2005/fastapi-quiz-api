@@ -43,15 +43,18 @@ class QuestionCreate(BaseModel):
     text: str
     category_id: Optional[int] = None
     difficulty: Optional[str] = None
+    time_limit_seconds: Optional[int] = None
 
 
 class QuestionResponse(QuestionCreate):
     id: int
     answers: List[AnswerResponse] = Field(default_factory=list)
+    time_limit_seconds: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
 
 class QuizAttemptCreate(BaseModel):
     category_id: Optional[int] = None
+    total_time_limit: Optional[int] = None
 
 class QuizAttemptResponse(BaseModel):
     id: int
@@ -59,6 +62,7 @@ class QuizAttemptResponse(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime] = None
     time_spent: Optional[int] = None
+    total_time_limit: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
 
 class QuizResultResponse(BaseModel):
@@ -66,6 +70,8 @@ class QuizResultResponse(BaseModel):
     total_questions: int
     correct_answers: int
     score: float
+    time_spent: Optional[int] = None
+    timed_out: bool = False
     completed_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
