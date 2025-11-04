@@ -54,6 +54,10 @@ class QuizAttempt(Model):
     completed_at = fields.DatetimeField(null=True)
     time_spent = fields.IntField(null=True)  # in seconds
     total_time_limit = fields.IntField(null=True)  # overall quiz time limit in seconds
+    difficulty_filter = fields.CharField(max_length=20, null=True)
+    num_questions = fields.IntField(null=True)
+    randomize = fields.BooleanField(default=False)
+    selected_question_ids = fields.TextField(null=True)  # comma-separated question ids
 
 class QuizResult(Model):
     id = fields.IntField(pk=True)

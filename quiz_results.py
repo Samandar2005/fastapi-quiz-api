@@ -20,12 +20,37 @@ async def start_quiz_attempt(
         category = await Category.get_or_none(id=attempt_data.category_id)
         if not category:
             raise HTTPException(status_code=404, detail="Category not found")
-    
+    # Build base query for selecting questions according to settings
+    qquery = Question.all()
+    if category:
+        qquery = qquery.filter(category_id=category.id)
+    if attempt_data.difficulty:
+        qquery = qquery.filter(difficulty=attempt_data.difficulty)
+
+    # fetch matching questions
+    matching_questions = await qquery.prefetch_related('answers')
+    q_ids = [q.id for q in matching_questions]
+
+    # apply randomization and limit
+    selected_ids = q_ids
+    if attempt_data.randomize and selected_ids:
+        import random
+        random.shuffle(selected_ids)
+    if attempt_data.num_questions is not None and selected_ids:
+        selected_ids = selected_ids[: attempt_data.num_questions]
+
+    selected_csv = ",".join(str(i) for i in selected_ids) if selected_ids else None
+
     attempt = await QuizAttempt.create(
         user=current_user,
         category=category,
         total_time_limit=attempt_data.total_time_limit,
+        difficulty_filter=attempt_data.difficulty,
+        num_questions=attempt_data.num_questions,
+        randomize=bool(attempt_data.randomize),
+        selected_question_ids=selected_csv,
     )
+
     return QuizAttemptResponse(
         id=attempt.id,
         category=category.name if category else None,
@@ -33,6 +58,10 @@ async def start_quiz_attempt(
         completed_at=None,
         time_spent=None,
         total_time_limit=attempt.total_time_limit,
+        difficulty=attempt.difficulty_filter,
+        num_questions=attempt.num_questions,
+        randomize=attempt.randomize,
+        selected_count=(len(selected_ids) if selected_ids else 0),
     )
 
 @router.post("/attempts/{attempt_id}/complete", response_model=QuizResultResponse)
@@ -52,22 +81,43 @@ async def complete_quiz_attempt(
     
     await attempt.fetch_related('category')
     
-    questions = None
-    if attempt.category:
-        questions = await Question.filter(category_id=attempt.category.id)
+    # Determine selected questions for scoring
+    selected_ids = None
+    if attempt.selected_question_ids:
+        try:
+            selected_ids = [int(x) for x in attempt.selected_question_ids.split(",") if x]
+        except Exception:
+            selected_ids = None
+
+    correct_answers = 0
+    if selected_ids is not None:
+        # total questions is the number of selected ids
+        total_questions = len(selected_ids)
+        # for each selected question, see if user provided a correct answer
+        for qid in selected_ids:
+            ua = await UserAnswer.filter(user=current_user, question_id=qid).prefetch_related('answer')
+            # if any answer for that question and it's correct, count as correct
+            for single in ua:
+                if single.answer and single.answer.is_correct:
+                    correct_answers += 1
+                    break
     else:
-        questions = await Question.all()
-    
-    user_answers = []
-    for question in questions:
-        answers = await UserAnswer.filter(
-            user=current_user,
-            question=question
-        ).prefetch_related('answer')
-        user_answers.extend(answers)
-    
-    total_questions = len(user_answers)
-    correct_answers = sum(1 for ua in user_answers if ua.answer.is_correct)
+        # fallback: use all questions in category (previous behavior)
+        if attempt.category:
+            questions = await Question.filter(category_id=attempt.category.id)
+        else:
+            questions = await Question.all()
+
+        user_answers = []
+        for question in questions:
+            answers = await UserAnswer.filter(
+                user=current_user,
+                question=question
+            ).prefetch_related('answer')
+            user_answers.extend(answers)
+
+        total_questions = len(user_answers)
+        correct_answers = sum(1 for ua in user_answers if ua.answer.is_correct)
     score = (correct_answers / total_questions * 100) if total_questions > 0 else 0
     
     # Update attempt

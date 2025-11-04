@@ -55,6 +55,9 @@ class QuestionResponse(QuestionCreate):
 class QuizAttemptCreate(BaseModel):
     category_id: Optional[int] = None
     total_time_limit: Optional[int] = None
+    difficulty: Optional[str] = None
+    num_questions: Optional[int] = None
+    randomize: Optional[bool] = False
 
 class QuizAttemptResponse(BaseModel):
     id: int
@@ -63,6 +66,10 @@ class QuizAttemptResponse(BaseModel):
     completed_at: Optional[datetime] = None
     time_spent: Optional[int] = None
     total_time_limit: Optional[int] = None
+    difficulty: Optional[str] = None
+    num_questions: Optional[int] = None
+    randomize: bool = False
+    selected_count: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
 
 class QuizResultResponse(BaseModel):
