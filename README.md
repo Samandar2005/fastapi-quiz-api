@@ -180,8 +180,14 @@ uvicorn main:app --reload
 | POST | `/auth/signup` | No | Create a new user |
 | POST | `/auth/token` | No | Obtain JWT access token |
 | GET | `/auth/me` | Yes | Get current authenticated user |
+| POST | `/quiz/categories/` | Yes | Create a new category |
+| GET | `/quiz/categories/` | Yes | List all categories |
+| GET | `/quiz/categories/{id}` | Yes | Get a specific category |
+| PUT | `/quiz/categories/{id}` | Yes | Update a category |
+| DELETE | `/quiz/categories/{id}` | Yes | Delete a category |
 | POST | `/quiz/questions/` | Yes | Create a quiz question |
 | GET | `/quiz/questions/` | Yes | List quiz questions |
+| GET | `/quiz/questions/?category_id={id}` | Yes | List questions by category |
 
 ### Testing
 Run tests:

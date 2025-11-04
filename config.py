@@ -1,10 +1,9 @@
 import os
 
 try:
-    from dotenv import load_dotenv  # type: ignore
+    from dotenv import load_dotenv 
     load_dotenv()
 except Exception:
-    # dotenv is optional in production; ignore if unavailable
     pass
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgres://postgres:1234@localhost:5432/quiz_db")

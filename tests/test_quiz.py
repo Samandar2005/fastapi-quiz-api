@@ -13,15 +13,62 @@ def test_create_question_requires_auth(client):
     assert r.status_code in (401, 403)
 
 
+def test_create_and_manage_categories(client):
+    token = auth_token(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Create category
+    r = client.post(
+        "/quiz/categories/",
+        json={"name": "Science", "description": "Science related questions"},
+        headers=headers
+    )
+    assert r.status_code == 200
+    category = r.json()
+    assert category["id"] > 0
+    assert category["name"] == "Science"
+
+    # Get categories
+    r = client.get("/quiz/categories/", headers=headers)
+    assert r.status_code == 200
+    categories = r.json()
+    assert len(categories) > 0
+
+    # Update category
+    r = client.put(
+        f"/quiz/categories/{category['id']}",
+        json={"name": "Science Updated", "description": "Updated description"},
+        headers=headers
+    )
+    assert r.status_code == 200
+    updated_category = r.json()
+    assert updated_category["name"] == "Science Updated"
+
+    # Delete category
+    r = client.delete(f"/quiz/categories/{category['id']}", headers=headers)
+    assert r.status_code == 200
+
 def test_create_and_list_questions(client):
     token = auth_token(client)
     headers = {"Authorization": f"Bearer {token}"}
 
-    # create a few
+    # Create category first
+    r = client.post(
+        "/quiz/categories/",
+        json={"name": "Math", "description": "Math questions"},
+        headers=headers
+    )
+    category = r.json()
+
+    # Create questions with category
     for i in range(3):
         r = client.post(
             "/quiz/questions/",
-            json={"text": f"Question {i}", "category": "cat", "difficulty": "easy"},
+            json={
+                "text": f"Question {i}",
+                "category_id": category["id"],
+                "difficulty": "easy"
+            },
             headers=headers,
         )
         assert r.status_code == 200, r.text
@@ -29,11 +76,18 @@ def test_create_and_list_questions(client):
         assert body["id"] > 0
         assert body["text"].startswith("Question")
 
-    # list
+    # List all questions
     r = client.get("/quiz/questions/?skip=0&limit=10", headers=headers)
     assert r.status_code == 200
     items = r.json()
     assert isinstance(items, list)
     assert len(items) >= 3
+
+    # List questions by category
+    r = client.get(f"/quiz/questions/?category_id={category['id']}", headers=headers)
+    assert r.status_code == 200
+    items = r.json()
+    assert isinstance(items, list)
+    assert len(items) == 3  # Should only return questions from this category
 
 

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
-from typing import List
+from typing import List, Optional
 
 
 class UserCreate(BaseModel):
@@ -27,10 +27,21 @@ class AnswerResponse(AnswerCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CategoryBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryResponse(CategoryBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
 class QuestionCreate(BaseModel):
     text: str
-    category: str = None
-    difficulty: str = None
+    category_id: Optional[int] = None
+    difficulty: Optional[str] = None
 
 
 class QuestionResponse(QuestionCreate):
