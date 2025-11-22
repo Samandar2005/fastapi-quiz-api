@@ -114,3 +114,53 @@ class LeaderboardEntry(BaseModel):
     average_score: float
     total_questions_answered: int
     model_config = ConfigDict(from_attributes=True)
+
+
+class CategoryStatistics(BaseModel):
+    category_id: int
+    category_name: str
+    total_quizzes: int
+    total_questions_answered: int
+    correct_answers: int
+    average_score: float
+    best_score: float
+    worst_score: float
+    total_time_spent: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DatePeriodStatistics(BaseModel):
+    period: str  # week, month, year
+    total_quizzes: int
+    total_questions_answered: int
+    correct_answers: int
+    average_score: float
+    total_time_spent: int
+    quizzes_by_day: Optional[dict] = None  # {date: count}
+    model_config = ConfigDict(from_attributes=True)
+
+
+class QuestionResultDetail(BaseModel):
+    question_id: int
+    question_text: str
+    user_answer_id: Optional[int] = None
+    user_answer_text: Optional[str] = None
+    correct_answer_ids: List[int] = Field(default_factory=list)
+    correct_answer_texts: List[str] = Field(default_factory=list)
+    is_correct: bool
+    time_spent: Optional[int] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AttemptDetailsResponse(BaseModel):
+    attempt_id: int
+    category_name: Optional[str] = None
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    total_questions: int
+    correct_answers: int
+    score: float
+    time_spent: Optional[int] = None
+    timed_out: bool
+    question_details: List[QuestionResultDetail] = Field(default_factory=list)
+    model_config = ConfigDict(from_attributes=True)
