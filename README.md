@@ -24,11 +24,14 @@ A minimal REST API for quizzes with JWT authentication. Built with FastAPI and T
 
 - User signup and token-based authentication (OAuth2 password flow)
 - Category CRUD for organizing questions
-- Create/list questions; optionally set a per-question time limit (`time_limit_seconds`)
+- Question CRUD (create, read, update, delete) with optional per-question time limits
+- Answer CRUD (create, read, update, delete) - manage answers independently
+- Support for multiple correct answers per question
+- Create questions with answers in a single request
 - Start quiz attempts with an optional overall `total_time_limit` (seconds)
 - Completing attempts computes score, records `time_spent`, and marks `timed_out` when limits are exceeded
 - Per-user aggregated statistics and a global leaderboard
-- Tests that cover auth, questions, categories, attempts and time-limit behavior
+- Comprehensive tests that cover auth, questions, categories, answers, attempts and time-limit behavior
 
 ### Project structure (top-level files)
 ```text
@@ -122,8 +125,20 @@ Categories
 
 Questions
 - `POST /quiz/questions/` — Create a question
-  - body example: `{ "text": "What is 2+2?", "category_id": 1, "difficulty": "easy", "time_limit_seconds": 10 }`
+  - body example: `{ "text": "What is 2+2?", "category_id": 1, "difficulty": "easy", "time_limit_seconds": 10, "answers": [{"text": "4", "is_correct": true}, {"text": "5", "is_correct": false}] }`
+  - Supports creating question with multiple answers (including multiple correct answers)
 - `GET /quiz/questions/` — List questions; optional query `category_id`, `skip`, `limit`
+- `GET /quiz/questions/{id}` — Get a single question with all its answers
+- `PUT /quiz/questions/{id}` — Update a question (partial update supported)
+- `DELETE /quiz/questions/{id}` — Delete a question
+
+Answers
+- `POST /quiz/questions/{question_id}/answers/` — Create an answer for a question
+  - body example: `{ "text": "4", "is_correct": true }`
+- `GET /quiz/questions/{question_id}/answers/` — Get all answers for a question
+- `GET /quiz/answers/{id}` — Get a single answer
+- `PUT /quiz/answers/{id}` — Update an answer (partial update supported)
+- `DELETE /quiz/answers/{id}` — Delete an answer
 
 Quiz attempts & results
 - `POST /quiz/attempts/` — Start a quiz attempt (optional `{ "category_id": 1, "total_time_limit": 300 }`)
@@ -144,7 +159,7 @@ Note: this implementation enforces total-time limits at attempt completion time 
 
 ### Examples
 
-Create question with per-question limit:
+Create question with per-question limit and multiple answers (including multiple correct answers):
 
 ```http
 POST /quiz/questions/
@@ -152,10 +167,55 @@ Authorization: Bearer <JWT>
 Content-Type: application/json
 
 {
-  "text": "What is 2+2?",
+  "text": "Which numbers are even?",
   "category_id": 1,
   "difficulty": "easy",
-  "time_limit_seconds": 15
+  "time_limit_seconds": 15,
+  "answers": [
+    {"text": "2", "is_correct": true},
+    {"text": "3", "is_correct": false},
+    {"text": "4", "is_correct": true},
+    {"text": "5", "is_correct": false}
+  ]
+}
+```
+
+Update a question:
+
+```http
+PUT /quiz/questions/{question_id}
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "text": "Updated question text",
+  "difficulty": "hard"
+}
+```
+
+Create an answer for a question:
+
+```http
+POST /quiz/questions/{question_id}/answers/
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "text": "New answer option",
+  "is_correct": false
+}
+```
+
+Update an answer:
+
+```http
+PUT /quiz/answers/{answer_id}
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "text": "Updated answer text",
+  "is_correct": true
 }
 ```
 

@@ -44,13 +44,30 @@ class QuestionCreate(BaseModel):
     category_id: Optional[int] = None
     difficulty: Optional[str] = None
     time_limit_seconds: Optional[int] = None
+    answers: Optional[List[AnswerCreate]] = None  # Optional list of answers to create with question
 
 
-class QuestionResponse(QuestionCreate):
-    id: int
-    answers: List[AnswerResponse] = Field(default_factory=list)
+class QuestionUpdate(BaseModel):
+    text: Optional[str] = None
+    category_id: Optional[int] = None
+    difficulty: Optional[str] = None
     time_limit_seconds: Optional[int] = None
+
+
+class QuestionResponse(BaseModel):
+    id: int
+    text: str
+    category_id: Optional[int] = None
+    category: Optional[str] = None  # Category name for convenience
+    difficulty: Optional[str] = None
+    time_limit_seconds: Optional[int] = None
+    answers: List[AnswerResponse] = Field(default_factory=list)
     model_config = ConfigDict(from_attributes=True)
+
+
+class AnswerUpdate(BaseModel):
+    text: Optional[str] = None
+    is_correct: Optional[bool] = None
 
 class QuizAttemptCreate(BaseModel):
     category_id: Optional[int] = None
